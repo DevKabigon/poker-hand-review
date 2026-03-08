@@ -4,8 +4,61 @@ import { NextResponse, type NextRequest } from "next/server";
 import { routing, type AppLocale } from "@/i18n/routing";
 
 const handleI18nRouting = createMiddleware(routing);
+const UNSUPPORTED_LOCALE_FALLBACK: AppLocale = "en";
+
+function getPreferredLocale(acceptLanguage: string | null): AppLocale {
+  if (!acceptLanguage) {
+    return UNSUPPORTED_LOCALE_FALLBACK;
+  }
+
+  const preferences = acceptLanguage
+    .split(",")
+    .map((entry) => {
+      const [rawTag, ...params] = entry.trim().split(";");
+      const qualityParam = params.find((param) => param.trim().startsWith("q="));
+      const quality = qualityParam ? Number(qualityParam.trim().slice(2)) : 1;
+
+      return {
+        tag: rawTag.toLowerCase(),
+        quality: Number.isFinite(quality) ? quality : 0,
+      };
+    })
+    .sort((left, right) => right.quality - left.quality);
+
+  for (const { tag } of preferences) {
+    if (!tag || tag === "*") {
+      continue;
+    }
+
+    const baseTag = tag.split("-")[0];
+
+    if (routing.locales.includes(tag as AppLocale)) {
+      return tag as AppLocale;
+    }
+
+    if (routing.locales.includes(baseTag as AppLocale)) {
+      return baseTag as AppLocale;
+    }
+  }
+
+  return UNSUPPORTED_LOCALE_FALLBACK;
+}
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const search = request.nextUrl.search;
+  const maybeLocale = pathname.split("/")[1];
+  const hasLocalePrefix = routing.locales.includes(maybeLocale as AppLocale);
+
+  if (!hasLocalePrefix) {
+    const locale = getPreferredLocale(request.headers.get("accept-language"));
+    const localizedPathname = pathname === "/" ? `/${locale}` : `/${locale}${pathname}`;
+
+    return NextResponse.redirect(
+      new URL(`${localizedPathname}${search}`, request.url),
+    );
+  }
+
   const response = handleI18nRouting(request);
 
   const supabase = createServerClient(
@@ -37,16 +90,20 @@ export async function proxy(request: NextRequest) {
   const effectiveUrl = rewriteHeader ? new URL(rewriteHeader) : request.nextUrl;
 
   const segments = effectiveUrl.pathname.split("/");
-  const maybeLocale = segments[1];
-  const hasLocalePrefix = routing.locales.includes(maybeLocale as (typeof routing.locales)[number]);
-  const currentLocale: AppLocale = hasLocalePrefix
-    ? (maybeLocale as AppLocale)
+  const effectiveMaybeLocale = segments[1];
+  const effectiveHasLocalePrefix = routing.locales.includes(
+    effectiveMaybeLocale as (typeof routing.locales)[number],
+  );
+  const currentLocale: AppLocale = effectiveHasLocalePrefix
+    ? (effectiveMaybeLocale as AppLocale)
     : routing.defaultLocale;
-  const pathname = hasLocalePrefix
+  const localizedPathname = effectiveHasLocalePrefix
     ? `/${segments.slice(2).join("/")}` || "/"
     : effectiveUrl.pathname;
   const normalizedPathname =
-    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+    localizedPathname.length > 1 && localizedPathname.endsWith("/")
+      ? localizedPathname.slice(0, -1)
+      : localizedPathname;
 
   const isProtectedRoute =
     normalizedPathname.startsWith("/history") ||

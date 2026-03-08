@@ -66,7 +66,7 @@ export default function LoginPage() {
           {t("backToHome")}
         </Link>
 
-        <Card className="rounded-3xl border-border/70 bg-card/75 shadow-[var(--shadow-soft)] backdrop-blur-md">
+        <Card className="rounded-3xl border-border/70 bg-card/75 shadow-(--shadow-soft) backdrop-blur-md">
           <CardHeader className="space-y-1 text-center">
             <div className="mb-4 flex justify-center">
               <BrandLogo

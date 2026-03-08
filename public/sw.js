@@ -1,8 +1,5 @@
-const CACHE_NAME = "phr-cache-v2";
-const NAVIGATION_FALLBACKS = ["/ko", "/"];
+const CACHE_NAME = "phr-cache-v4";
 const STATIC_ASSETS = [
-  "/",
-  "/ko",
   "/manifest.webmanifest",
   "/favicon.ico",
   "/apple-touch-icon.png",
@@ -10,7 +7,6 @@ const STATIC_ASSETS = [
   "/pwa-512x512.png",
   "/og-image.png",
 ];
-const NAVIGATION_TIMEOUT_MS = 4000;
 
 function isLocalAsset(url) {
   if (url.origin !== self.location.origin) {
@@ -34,17 +30,6 @@ async function putInCache(request, response) {
   }
   const cache = await caches.open(CACHE_NAME);
   await cache.put(request, response.clone());
-}
-
-async function fetchWithTimeout(request, timeoutMs) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(request, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 self.addEventListener("install", (event) => {
@@ -78,35 +63,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      (async () => {
-        const cache = await caches.open(CACHE_NAME);
-        const cached = await cache.match(request);
-
-        if (cached) {
-          event.waitUntil(
-            fetchWithTimeout(request, NAVIGATION_TIMEOUT_MS)
-              .then((response) => putInCache(request, response))
-              .catch(() => undefined),
-          );
-          return cached;
-        }
-
-        try {
-          const fresh = await fetchWithTimeout(request, NAVIGATION_TIMEOUT_MS);
-          event.waitUntil(putInCache(request, fresh));
-          return fresh;
-        } catch {
-          for (const fallbackPath of NAVIGATION_FALLBACKS) {
-            const fallback = await cache.match(fallbackPath);
-            if (fallback) {
-              return fallback;
-            }
-          }
-          return Response.redirect("/ko", 302);
-        }
-      })(),
-    );
     return;
   }
 
