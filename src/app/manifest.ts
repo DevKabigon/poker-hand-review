@@ -48,7 +48,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "Outs Calculator",
         short_name: "Outs",
-        description: "Calculate winning outs, villain outs, and chop cards.",
+        description: "Check next-card outs for trailing players in heads-up and multiway spots.",
         url: `${defaultLocalePrefix}/tools/outs`,
         icons: [
           { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },

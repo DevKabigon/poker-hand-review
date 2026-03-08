@@ -20,6 +20,10 @@ const SUIT_ORDER: Suit[] = ["s", "h", "d", "c"];
 
 export type HandScore = [number, number, number, number, number, number];
 export type HandOutcome = "win" | "tie" | "lose";
+export type MultiwayHandResult = {
+  scores: HandScore[];
+  winningPlayerIndices: number[];
+};
 
 type ParsedCard = {
   rank: number;
@@ -247,4 +251,33 @@ export function compareHands(heroCards: Card[], villainCards: Card[], board: Car
     return "lose";
   }
   return "tie";
+}
+
+export function comparePlayerHands(playerHands: Card[][], board: Card[]): MultiwayHandResult {
+  if (playerHands.length < 2) {
+    throw new Error("comparePlayerHands requires at least 2 players.");
+  }
+
+  const scores = playerHands.map((cards) => evaluateBestHand([...cards, ...board]));
+  let bestScore = scores[0];
+  let winningPlayerIndices = [0];
+
+  for (let index = 1; index < scores.length; index += 1) {
+    const compared = compareScores(scores[index], bestScore);
+
+    if (compared > 0) {
+      bestScore = scores[index];
+      winningPlayerIndices = [index];
+      continue;
+    }
+
+    if (compared === 0) {
+      winningPlayerIndices.push(index);
+    }
+  }
+
+  return {
+    scores,
+    winningPlayerIndices,
+  };
 }
